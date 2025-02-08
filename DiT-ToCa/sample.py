@@ -79,7 +79,7 @@ def main(args):
 
     if args.ddim_sample:
         samples = diffusion.ddim_sample_loop(
-            model.forward_with_cfg, z.shape, z, clip_denoised=False, model_kwargs=model_kwargs, progress=True, device=device
+            model.forward_with_cfg, z.shape, z, clip_denoised=False, model_kwargs=model_kwargs, progress=True, device=device, cluster_steps=args.cluster_steps, cluster_nums=args.cluster_nums
         )
     else:
         samples = diffusion.p_sample_loop(
@@ -118,7 +118,8 @@ if __name__ == "__main__":
                         help="soft weight for updating the stale tokens by adding extra scores.")
     parser.add_argument("--test-FLOPs", action="store_true", default=False)
     #parser.add_argument("--merge-weight", type=float, default=0.0) # never used in the paper, just for exploration
-
+    parser.add_argument("--cluster-steps", type=int, default=5)
+    parser.add_argument("--cluster-nums", type=int, default=4)
     args = parser.parse_args()
     main(args)
 

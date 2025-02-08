@@ -29,10 +29,10 @@ def cache_cutfresh(cache_dic, tokens, current):
     # #stale_indices = indices[:, topk:]
     # # (B, fresh_ratio *N)
 
-    group_step = 10
-    cluster_nums = 4
+    cluster_step = cache_dic['cluster_steps']
+    cluster_nums = cache_dic['cluster_nums']
     if layer == 0 and module == 'mlp':
-        if cache_dic['group_info'] is None or step % group_step == 0:
+        if cache_dic['group_info'] is None or step % cluster_step == 0:
             cluster_indices = get_group_indices(cache_dic['key_matrix'], cluster_nums, dims=2)
             cache_dic['group_info'] = cluster_indices
     # visualize_cluster(cache_dic['group_info'], step)

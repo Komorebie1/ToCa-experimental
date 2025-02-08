@@ -1,4 +1,4 @@
-def cache_init(model_kwargs, num_steps):   
+def cache_init(model_kwargs, num_steps, cluster_steps, cluster_nums):   
     '''
     Initialization for cache.
     '''
@@ -12,6 +12,8 @@ def cache_init(model_kwargs, num_steps):
     cache_dic['attn_map'][-1] = {}
     cache_dic['group_info'] = None
     cache_dic['key_matrix'] = None
+    cache_dic['cluster_steps'] = cluster_steps
+    cache_dic['cluster_nums'] = cluster_nums
     for j in range(28):
         cache[-1][j] = {}
         cache_index[-1][j] = {}

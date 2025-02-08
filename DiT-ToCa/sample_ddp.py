@@ -87,7 +87,8 @@ def main(args):
     folder_name = f"ToCa-{model_string_name}-{ckpt_string_name}-size-{args.image_size}-vae-{args.vae}-" \
                   f"cfg-{args.cfg_scale}-seed-{args.global_seed}-step-{args.num_sampling_steps}-num-{args.num_fid_samples}"\
                   f"-{args.cache_type}-{args.fresh_ratio}-{args.ratio_scheduler}-{args.force_fresh}-{args.fresh_threshold}"\
-                  f"-softweight-{args.soft_fresh_weight}2"
+                  f"-softweight-{args.soft_fresh_weight}"\
+                  f"-cluster-{args.cluster_steps}-{args.cluster_nums}"
     sample_folder_dir = f"{args.sample_dir}/{folder_name}"
     if rank == 0:
         os.makedirs(sample_folder_dir, exist_ok=True)
@@ -137,7 +138,7 @@ def main(args):
         # Sample images:
         if args.ddim_sample:
             samples = diffusion.ddim_sample_loop(
-                sample_fn, z.shape, z, clip_denoised=False, model_kwargs=model_kwargs, progress=False, device=device
+                sample_fn, z.shape, z, clip_denoised=False, model_kwargs=model_kwargs, progress=False, device=device, cluster_steps=args.cluster_steps, cluster_nums=args.cluster_nums
             )
         else:
             samples = diffusion.p_sample_loop(
