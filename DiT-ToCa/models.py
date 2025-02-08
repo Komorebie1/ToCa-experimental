@@ -149,6 +149,8 @@ class DiTBlock(nn.Module):
             attn_output, attn_map = self.attn(modulate(self.norm1(x), shift_msa, scale_msa), cache_dic=cache_dic, current=current)
             cache_dic['cache'][-1][layer]['attn'] = attn_output
             cache_dic['attn_map'][-1][layer] = attn_map
+            if layer == 0:
+                cache_dic['key_matrix'] = self.attn.key_matrix
             force_init(cache_dic, current, x)
             x = x + gate_msa.unsqueeze(1) * attn_output
 

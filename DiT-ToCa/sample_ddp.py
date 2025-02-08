@@ -87,7 +87,7 @@ def main(args):
     folder_name = f"ToCa-{model_string_name}-{ckpt_string_name}-size-{args.image_size}-vae-{args.vae}-" \
                   f"cfg-{args.cfg_scale}-seed-{args.global_seed}-step-{args.num_sampling_steps}-num-{args.num_fid_samples}"\
                   f"-{args.cache_type}-{args.fresh_ratio}-{args.ratio_scheduler}-{args.force_fresh}-{args.fresh_threshold}"\
-                  f"-softweight-{args.soft_fresh_weight}"
+                  f"-softweight-{args.soft_fresh_weight}2"
     sample_folder_dir = f"{args.sample_dir}/{folder_name}"
     if rank == 0:
         os.makedirs(sample_folder_dir, exist_ok=True)
@@ -168,8 +168,8 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", type=str, choices=list(DiT_models.keys()), default="DiT-XL/2")
-    parser.add_argument("--vae",  type=str, choices=["ema", "mse"], default="ema")
-    parser.add_argument("--sample-dir", type=str, default="/root/autodl-tmp/samples") # Change this to your desired sample directory
+    parser.add_argument("--vae",  type=str, choices=["ema", "mse"], default="mse")
+    parser.add_argument("--sample-dir", type=str, default="./samples") # Change this to your desired sample directory
     parser.add_argument("--per-proc-batch-size", type=int, default=32)
     parser.add_argument("--num-fid-samples", type=int, default=50_000)
     parser.add_argument("--image-size", type=int, choices=[256, 512], default=256)

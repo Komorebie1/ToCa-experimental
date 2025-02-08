@@ -10,6 +10,8 @@ def cache_init(model_kwargs, num_steps):
     cache_index['layer_index']={}
     cache_dic['attn_map'] = {}
     cache_dic['attn_map'][-1] = {}
+    cache_dic['group_info'] = None
+    cache_dic['key_matrix'] = None
     for j in range(28):
         cache[-1][j] = {}
         cache_index[-1][j] = {}

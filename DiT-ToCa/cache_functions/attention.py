@@ -31,6 +31,7 @@ class Attention(nn.Module):
         self.attn_drop = nn.Dropout(attn_drop)
         self.proj = nn.Linear(dim, dim)
         self.proj_drop = nn.Dropout(proj_drop)
+        self.key_matrix = None
 
     def forward(self, x: torch.Tensor, cache_dic, current, fresh_indices=None) -> torch.Tensor:
     # 0.4ms extra cost on A800, mainly tensor operations
@@ -46,6 +47,7 @@ class Attention(nn.Module):
             cache_dic['cache'][-1][current['layer']]['v_norm'] = torch.norm(v, dim=-1, p=2)
 
         q, k = self.q_norm(q), self.k_norm(k)
+        self.key_matrix = k.permute(0, 2, 1, 3).reshape(B, N, self.num_heads * self.head_dim).detach() # (B, N, num_heads*head_dim)
         #q: (B, num_heads, N-M, head_dim), k: (B, num_heads, N, head_dim), v: (B, num_heads, N, head_dim)
         if (self.fused_attn) and (cache_dic['cache_type'] !='attention'):
             x = F.scaled_dot_product_attention(
