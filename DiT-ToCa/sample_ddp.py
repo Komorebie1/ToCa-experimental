@@ -196,3 +196,5 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     main(args)
+
+# torchrun --nnodes=1 --nproc_per_node=6 sample_ddp.py --model DiT-XL/2 --per-proc-batch-size 150 --image-size 256 --cfg-scale 1.5 --num-sampling-steps 50 --cache-type attention --fresh-ratio 0.07 --ratio-scheduler ToCa-ddim50 --force-fresh global --fresh-threshold 4 --soft-fresh-weight 0.25 --num-fid-samples 50000 --ddim-sample --cluster-steps 5 --cluster-nums 64

@@ -95,7 +95,7 @@ def main(args):
     samples = vae.decode(samples / 0.18215).sample
 
     # Save and display images:
-    save_image(samples, "sample_985_group_8_5_max.png", nrow=4, normalize=True, value_range=(-1, 1))
+    save_image(samples, "sample_985_group_max_10_32.png", nrow=4, normalize=True, value_range=(-1, 1))
 
 
 if __name__ == "__main__":
@@ -126,4 +126,4 @@ if __name__ == "__main__":
     main(args)
 
 #cd DiT-ToCa
-#python sample.py --image-size 256 --num-sampling-steps 50 --cache-type attention --fresh-threshold 4 --fresh-ratio 0.07 --ratio-scheduler ToCa-ddim50  --force-fresh global --soft-fresh-weight 0.25 --ddim-sample --cluster-steps 5 --cluster-nums 8
+#python sample.py --image-size 256 --num-sampling-steps 50 --cache-type attention --fresh-threshold 4 --fresh-ratio 0.07 --ratio-scheduler ToCa-ddim50  --force-fresh global --soft-fresh-weight 0.25 --ddim-sample --cluster-steps 5 --cluster-nums 64

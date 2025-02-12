@@ -15,8 +15,8 @@ def cache_cutfresh(cache_dic, tokens, current):
     layer = current['layer']
     module = current['module']
     
-    # fresh_ratio = fresh_ratio_scheduler(cache_dic, current)
-    # fresh_ratio = torch.clamp(torch.tensor(fresh_ratio), 0.0, 1.0)
+    fresh_ratio = fresh_ratio_scheduler(cache_dic, current)
+    fresh_ratio = torch.clamp(torch.tensor(fresh_ratio), 0.0, 1.0)
     # Generate the index tensor for fresh tokens
     score = score_evaluate(cache_dic, tokens, current)
     # score = local_selection_with_bonus(score, 0.6, 2) # Uniform Spatial Distribution s4 mentioned in the paper
@@ -36,21 +36,17 @@ def cache_cutfresh(cache_dic, tokens, current):
             cluster_indices = get_group_indices(cache_dic['key_matrix'], cluster_nums, dims=2)
             cache_dic['group_info'] = cluster_indices
     # visualize_cluster(cache_dic['group_info'], step)
-    fresh_indices = get_group_score(score, cache_dic['group_info'], cluster_nums)
+    fresh_indices = get_cluster_max_indices(score, cache_dic['group_info'], cluster_nums)
 
     # Updating the Cache Frequency Score s3 mentioned in the paper
     # stale tokens index + 1, fresh tokens index = 0
     cache_dic['cache_index'][-1][layer][module] += 1
     cache_dic['cache_index'][-1][layer][module].scatter_(dim=1, index=fresh_indices, 
                                                                     src = torch.zeros_like(fresh_indices, dtype=torch.int, device=fresh_indices.device))
-    
-    ## not used in the final version
-    #cache_dic['cache_index']['layer_index'][module] += 1
-    #cache_dic['cache_index']['layer_index'][module].scatter_(dim=1, index=fresh_indices, 
-    #                                                                src = torch.zeros_like(fresh_indices, dtype=torch.int, device=fresh_indices.device))
+    # cache_dic['cache_index'][-1][layer][module] *= (1 - fresh_indices)
+
     # select the fresh tokens out
     fresh_indices_expand = fresh_indices.unsqueeze(-1).expand(-1, -1, tokens.shape[-1])
-
     if module in ['mlp', 'attn']:
         # cut out the fresh tokens
         fresh_tokens = torch.gather(input = tokens, dim = 1, index = fresh_indices_expand)
@@ -193,8 +189,40 @@ def get_group_score(score, cluster_indices, cluster_nums):
     cluster_counts = one_hot.sum(dim=1)
     new_score = cluster_sums / (cluster_counts + 1e-8)
     
-    # 直接返回最大值索引避免中间张量
-    return new_score.argmax(dim=-1, keepdim=True)
+    return torch.eq(cluster_indices, new_score.argmax(dim=-1, keepdim=True)).int()
+
+def get_group_max_score(score, cluster_indices, cluster_nums):
+    cluster_mask = F.one_hot(cluster_indices, cluster_nums).bool()
+    score_expand = score.unsqueeze(-1).expand(-1, -1, cluster_nums)
+    cluster_score = score_expand.masked_fill(~cluster_mask, float('-inf'))
+    max_values, max_indices = cluster_score.max(dim=1, keepdim=True)
+
+    valid_maxk = (max_values != float('inf'))
+    max_indices = torch.where(valid_maxk, max_indices, torch.tensor(-1, device=score.device))
+    return max_indices
+
+def get_cluster_max_indices(score, cluster_indices, cluster_nums):
+    B, N = score.shape
+    device = score.device
+    
+    # 生成聚类索引的掩码 [B, K, N]
+    k_indices = torch.arange(cluster_nums, device=device).view(1, cluster_nums, 1)
+    mask = (cluster_indices.unsqueeze(1) == k_indices)
+    
+    # 将非当前聚类的分数设为负无穷
+    score_masked = score.unsqueeze(1).masked_fill(~mask, -float('inf'))
+    
+    # 找到每个聚类的最大索引 [B, K]
+    max_indices = score_masked.argmax(dim=-1)
+    
+    # 计算每个聚类的元素数量并检查空聚类
+    cluster_count = mask.sum(dim=-1)
+    empty_cluster_mask = (cluster_count == 0)
+    
+    # 将空聚类的索引填充为0（或任意有效索引）
+    max_indices = torch.where(empty_cluster_mask, torch.tensor(0, device=device), max_indices)
+    
+    return max_indices
 
 def kmeans_token_cluster_gpu(tokens, cluster_num, max_iters=100):
     '''
