@@ -170,7 +170,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", type=str, choices=list(DiT_models.keys()), default="DiT-XL/2")
     parser.add_argument("--vae",  type=str, choices=["ema", "mse"], default="mse")
-    parser.add_argument("--sample-dir", type=str, default="./samples") # Change this to your desired sample directory
+    parser.add_argument("--sample-dir", type=str, default="/root/autodl-tmp/samples") # Change this to your desired sample directory
     parser.add_argument("--per-proc-batch-size", type=int, default=32)
     parser.add_argument("--num-fid-samples", type=int, default=50_000)
     parser.add_argument("--image-size", type=int, choices=[256, 512], default=256)
