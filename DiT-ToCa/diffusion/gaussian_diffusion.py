@@ -631,8 +631,6 @@ class GaussianDiffusion:
         device=None,
         progress=False,
         eta=0.0,
-        cluster_steps=5,
-        cluster_nums=4,
     ):
         """
         Generate samples from the model using DDIM.
@@ -650,8 +648,6 @@ class GaussianDiffusion:
             device=device,
             progress=progress,
             eta=eta,
-            cluster_steps=cluster_steps,
-            cluster_nums=cluster_nums,
         ):
             final = sample
         return final["sample"]
@@ -668,8 +664,6 @@ class GaussianDiffusion:
         device=None,
         progress=False,
         eta=0.0,
-        cluster_steps=5,
-        cluster_nums=4,
     ):
         """
         Use DDIM to sample from the model and yield intermediate samples from
@@ -692,7 +686,7 @@ class GaussianDiffusion:
             indices = tqdm(indices)
 
         # Initialization for ToCa     
-        cache_dic, current = cache_init(model_kwargs=model_kwargs, num_steps=self.num_timesteps, cluster_steps=cluster_steps, cluster_nums=cluster_nums)
+        cache_dic, current = cache_init(model_kwargs=model_kwargs, num_steps=self.num_timesteps)
 
         for i in indices:
             t = th.tensor([i] * shape[0], device=device)

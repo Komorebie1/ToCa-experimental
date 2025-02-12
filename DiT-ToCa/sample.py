@@ -71,6 +71,8 @@ def main(args):
     model_kwargs['ratio_scheduler']   = args.ratio_scheduler
     model_kwargs['soft_fresh_weight'] = args.soft_fresh_weight
     model_kwargs['test_FLOPs']        = args.test_FLOPs
+    model_kwargs['cluster_steps']     = args.cluster_steps
+    model_kwargs['cluster_nums']      = args.cluster_nums
         
 
     start = torch.cuda.Event(enable_timing=True)
@@ -79,7 +81,7 @@ def main(args):
 
     if args.ddim_sample:
         samples = diffusion.ddim_sample_loop(
-            model.forward_with_cfg, z.shape, z, clip_denoised=False, model_kwargs=model_kwargs, progress=True, device=device, cluster_steps=args.cluster_steps, cluster_nums=args.cluster_nums
+            model.forward_with_cfg, z.shape, z, clip_denoised=False, model_kwargs=model_kwargs, progress=True, device=device
         )
     else:
         samples = diffusion.p_sample_loop(
@@ -93,7 +95,7 @@ def main(args):
     samples = vae.decode(samples / 0.18215).sample
 
     # Save and display images:
-    save_image(samples, "sample_985_group_4_10_new.png", nrow=4, normalize=True, value_range=(-1, 1))
+    save_image(samples, "sample_985_group_8_5_max.png", nrow=4, normalize=True, value_range=(-1, 1))
 
 
 if __name__ == "__main__":
@@ -124,4 +126,4 @@ if __name__ == "__main__":
     main(args)
 
 #cd DiT-ToCa
-#python sample.py --image-size 256 --num-sampling-steps 50 --cache-type attention --fresh-threshold 4 --fresh-ratio 0.07 --ratio-scheduler ToCa-ddim50  --force-fresh global --soft-fresh-weight 0.25 --ddim-sample
+#python sample.py --image-size 256 --num-sampling-steps 50 --cache-type attention --fresh-threshold 4 --fresh-ratio 0.07 --ratio-scheduler ToCa-ddim50  --force-fresh global --soft-fresh-weight 0.25 --ddim-sample --cluster-steps 5 --cluster-nums 8
