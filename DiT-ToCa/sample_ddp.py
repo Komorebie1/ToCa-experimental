@@ -133,6 +133,8 @@ def main(args):
         model_kwargs['ratio_scheduler']   = args.ratio_scheduler
         model_kwargs['soft_fresh_weight'] = args.soft_fresh_weight
         model_kwargs['test_FLOPs']        = args.test_FLOPs
+        model_kwargs['cluster_steps']     = args.cluster_steps
+        model_kwargs['cluster_nums']      = args.cluster_nums
         
 
         # Sample images:
@@ -193,8 +195,10 @@ if __name__ == "__main__":
                         help="soft weight for updating the stale tokens by adding extra scores.")
     parser.add_argument("--test-FLOPs", action="store_true", default=False)
     #parser.add_argument("--merge-weight", type=float, default=0.0) # never used in the paper, just for exploration
+    parser.add_argument("--cluster-steps", type=int, default=5)
+    parser.add_argument("--cluster-nums", type=int, default=4)
 
     args = parser.parse_args()
     main(args)
 
-# torchrun --nnodes=1 --nproc_per_node=6 sample_ddp.py --model DiT-XL/2 --per-proc-batch-size 150 --image-size 256 --cfg-scale 1.5 --num-sampling-steps 50 --cache-type attention --fresh-ratio 0.07 --ratio-scheduler ToCa-ddim50 --force-fresh global --fresh-threshold 4 --soft-fresh-weight 0.25 --num-fid-samples 50000 --ddim-sample --cluster-steps 5 --cluster-nums 64
+# torchrun --nnodes=1 --nproc_per_node=1 sample_ddp.py --model DiT-XL/2 --per-proc-batch-size 100 --image-size 256 --cfg-scale 1.5 --num-sampling-steps 50 --cache-type attention --fresh-ratio 0.07 --ratio-scheduler ToCa-ddim50 --force-fresh global --fresh-threshold 4 --soft-fresh-weight 0.25 --num-fid-samples 50000 --ddim-sample --cluster-steps 5 --cluster-nums 64
