@@ -1,3 +1,4 @@
+import numpy
 def cache_init(model_kwargs, num_steps):   
     '''
     Initialization for cache.
@@ -32,6 +33,7 @@ def cache_init(model_kwargs, num_steps):
     cache_dic['test_FLOPs']           = model_kwargs['test_FLOPs'] 
     cache_dic['cluster_steps']        = model_kwargs['cluster_steps']
     cache_dic['cluster_nums']         = model_kwargs['cluster_nums']
+    cache_dic['current_cluster_nums'] = numpy.linspace(2 * cache_dic['cluster_nums'], cache_dic['cluster_nums'] + 1, num_steps)
     
     cache_dic['cache'][-1]['noise_steps'] = {}
     cache_dic['counter'] = 0.0

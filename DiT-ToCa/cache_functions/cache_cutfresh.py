@@ -1,6 +1,7 @@
 from .fresh_ratio_scheduler import fresh_ratio_scheduler
 from .score_evaluate import score_evaluate
 from .token_merge import token_merge
+from .cluster_scheduler import cluster_scheduler
 import torch
 import torch.nn.functional as F
 def cache_cutfresh(cache_dic, tokens, current):
@@ -30,14 +31,17 @@ def cache_cutfresh(cache_dic, tokens, current):
     # # (B, fresh_ratio *N)
 
     cluster_step = cache_dic['cluster_steps']
-    cluster_nums = cache_dic['cluster_nums']
+    # cluster_nums = cache_dic['cluster_nums'] * step // 12
+    cluster_nums, k = cluster_scheduler(cache_dic, current) 
     if layer == 0 and module == 'mlp':
         if cache_dic['group_info'] is None or step % cluster_step == 0:
             cluster_indices = get_group_indices(cache_dic['key_matrix'], cluster_nums, dims=2)
             cache_dic['group_info'] = cluster_indices
     # visualize_cluster(cache_dic['group_info'], step)
-    fresh_indices = get_cluster_max_indices(score, cache_dic['group_info'], cluster_nums)
+    # fresh_indices = get_cluster_max_indices(score, cache_dic['group_info'], cluster_nums)
+    fresh_indices = get_cluster_topk_indices(score, cache_dic['group_info'], cluster_nums, k)
 
+    print(fresh_indices.shape)
     # Updating the Cache Frequency Score s3 mentioned in the paper
     # stale tokens index + 1, fresh tokens index = 0
     cache_dic['cache_index'][-1][layer][module] += 1
@@ -223,6 +227,41 @@ def get_cluster_max_indices(score, cluster_indices, cluster_nums):
     max_indices = torch.where(empty_cluster_mask, torch.tensor(0, device=device), max_indices)
     
     return max_indices
+
+def get_cluster_topk_indices(score, cluster_indices, cluster_nums, K):
+    B, N = score.shape
+    device = score.device
+    
+    # 生成聚类索引的掩码 [B, K, N]
+    k_indices = torch.arange(cluster_nums, device=device).view(1, cluster_nums, 1)
+    mask = (cluster_indices.unsqueeze(1) == k_indices)
+    
+    # 将非当前聚类的分数设为负无穷
+    score_masked = score.unsqueeze(1).masked_fill(~mask, -float('inf'))
+    
+    # 找到每个聚类的前K个最大索引 [B, K, topK]
+    _, topk_indices = torch.topk(score_masked, K, dim=-1)
+    
+    # 计算每个聚类的元素数量并检查是否小于K
+    cluster_count = mask.sum(dim=-1)
+    # insufficient_mask = (cluster_count < K)
+    
+    # # 对于元素数量小于K的聚类，用0（或任意有效索引）填充
+    # if insufficient_mask.any():
+    #     # 创建一个填充索引的张量 [B, K, K]
+    #     fill_indices = torch.zeros((B, cluster_nums, K), dtype=torch.long, device=device)
+        
+    #     # 将填充索引应用到不足的聚类
+    #     topk_indices = torch.where(insufficient_mask.unsqueeze(-1), fill_indices, topk_indices)
+    # 处理空聚类和不足K的情况
+    valid_mask = (torch.arange(K, device=device).view(1, 1, -1) < cluster_count.unsqueeze(-1))
+    topk_indices = torch.where(
+        valid_mask | (cluster_count == 0).unsqueeze(-1),
+        topk_indices,
+        torch.zeros_like(topk_indices)
+    )
+    
+    return topk_indices.view(B, -1)
 
 def kmeans_token_cluster_gpu(tokens, cluster_num, max_iters=100):
     '''

@@ -140,7 +140,7 @@ def main(args):
         # Sample images:
         if args.ddim_sample:
             samples = diffusion.ddim_sample_loop(
-                sample_fn, z.shape, z, clip_denoised=False, model_kwargs=model_kwargs, progress=False, device=device, cluster_steps=args.cluster_steps, cluster_nums=args.cluster_nums
+                sample_fn, z.shape, z, clip_denoised=False, model_kwargs=model_kwargs, progress=False, device=device,
             )
         else:
             samples = diffusion.p_sample_loop(
