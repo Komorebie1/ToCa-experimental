@@ -95,7 +95,7 @@ def main(args):
     samples = vae.decode(samples / 0.18215).sample
 
     # Save and display images:
-    save_image(samples, "sample_985_group_max_10_32.png", nrow=4, normalize=True, value_range=(-1, 1))
+    save_image(samples, "sample_985_zero_102_64.png", nrow=4, normalize=True, value_range=(-1, 1))
 
 
 if __name__ == "__main__":

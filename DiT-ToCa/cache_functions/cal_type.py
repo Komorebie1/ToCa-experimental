@@ -10,7 +10,11 @@ def cal_type(cache_dic, current):
     else:
         fresh_interval = cache_dic['fresh_threshold']
 
-    if (current['step'] % fresh_interval == 0) or first_step:
+    # if (current['step'] % fresh_interval == 0) or first_step:
+    #     current['type'] = 'full'
+
+    ## 为了测试聚类效果
+    if first_step:
         current['type'] = 'full'
         
     elif ((current['step'] % fresh_interval) % 2 == 1): #[1,3,5] [2,4,6]

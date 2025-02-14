@@ -23,6 +23,7 @@ def cache_cutfresh(cache_dic, tokens, current):
     # score = local_selection_with_bonus(score, 0.6, 2) # Uniform Spatial Distribution s4 mentioned in the paper
     # score = consider_neighbor_score(score, 1)
 
+    #######################################
     # # 0.6, 2
     # indices = score.argsort(dim=-1, descending=True)
     # topk = int(fresh_ratio * score.shape[1])
@@ -30,36 +31,54 @@ def cache_cutfresh(cache_dic, tokens, current):
     # #stale_indices = indices[:, topk:]
     # # (B, fresh_ratio *N)
 
-    cluster_step = cache_dic['cluster_steps']
-    # cluster_nums = cache_dic['cluster_nums'] * step // 12
-    cluster_nums, k = cluster_scheduler(cache_dic, current) 
-    if layer == 0 and module == 'mlp':
-        if cache_dic['group_info'] is None or step % cluster_step == 0:
-            cluster_indices = get_group_indices(cache_dic['key_matrix'], cluster_nums, dims=2)
-            cache_dic['group_info'] = cluster_indices
-    # visualize_cluster(cache_dic['group_info'], step)
-    # fresh_indices = get_cluster_max_indices(score, cache_dic['group_info'], cluster_nums)
-    fresh_indices = get_cluster_topk_indices(score, cache_dic['group_info'], cluster_nums, k)
+    # cluster_step = cache_dic['cluster_steps']
+    # cluster_nums = cache_dic['cluster_nums']
+    # # cluster_nums, k = cluster_scheduler(cache_dic, current) 
+    # if layer == 0 and module == 'mlp':
+    #     if cache_dic['group_info'] is None or step % cluster_step == 0:
+    #         cluster_indices = get_group_indices(cache_dic['key_matrix'], cluster_nums, dims=2)
+    #         cache_dic['group_info'] = cluster_indices
+    # # visualize_cluster(cache_dic['group_info'], step)
+    # # fresh_indices = get_cluster_max_indices(score, cache_dic['group_info'], cluster_nums)
+    # # fresh_indices = get_cluster_topk_indices(score, cache_dic['group_info'], cluster_nums, k)
+    # fresh_indices = get_max_cluster_indices(score, cache_dic['group_info'], cluster_nums)
 
-    print(fresh_indices.shape)
-    # Updating the Cache Frequency Score s3 mentioned in the paper
-    # stale tokens index + 1, fresh tokens index = 0
+    # # print(fresh_indices.shape)
+    # # Updating the Cache Frequency Score s3 mentioned in the paper
+    # # stale tokens index + 1, fresh tokens index = 0
+    # cache_dic['cache_index'][-1][layer][module] += 1
+    # cache_dic['cache_index'][-1][layer][module].scatter_(dim=1, index=fresh_indices, 
+    #                                                                 src = torch.zeros_like(fresh_indices, dtype=torch.int, device=fresh_indices.device))
+    # # cache_dic['cache_index'][-1][layer][module] *= (1 - fresh_indices)
+
+    # # select the fresh tokens out
+    # fresh_indices_expand = fresh_indices.unsqueeze(-1).expand(-1, -1, tokens.shape[-1])
+    # if module in ['mlp', 'attn']:
+    #     # cut out the fresh tokens
+    #     fresh_tokens = torch.gather(input = tokens, dim = 1, index = fresh_indices_expand)
+
+    #     return fresh_indices, fresh_tokens
+    
+    # else:
+    #     # no need for this branch hhh.
+    #     raise ValueError("Unrecognized module?", module)
+    ###############################################
+
+    ### 测试聚类效果 ################################
+    if layer == 0:
+        cluster_indices = get_group_indices(cache_dic['key_matrix'], cache_dic['cluster_nums'], dims=2)
+        cache_dic['group_info'] = cluster_indices
+
+    fresh_indices, fresh_tokens = zero_cluster_tokens(tokens, cache_dic['group_info'], 102)
+    # fresh_indices = torch.arange(tokens.shape[1], device=tokens.device).expand(tokens.shape[0], tokens.shape[1])
+    # tokens[:, 110, :] = 0
+    # fresh_tokens = tokens
+
     cache_dic['cache_index'][-1][layer][module] += 1
     cache_dic['cache_index'][-1][layer][module].scatter_(dim=1, index=fresh_indices, 
                                                                     src = torch.zeros_like(fresh_indices, dtype=torch.int, device=fresh_indices.device))
-    # cache_dic['cache_index'][-1][layer][module] *= (1 - fresh_indices)
-
-    # select the fresh tokens out
-    fresh_indices_expand = fresh_indices.unsqueeze(-1).expand(-1, -1, tokens.shape[-1])
-    if module in ['mlp', 'attn']:
-        # cut out the fresh tokens
-        fresh_tokens = torch.gather(input = tokens, dim = 1, index = fresh_indices_expand)
-
-        return fresh_indices, fresh_tokens
-    
-    else:
-        # no need for this branch hhh.
-        raise ValueError("Unrecognized module?", module)
+    return fresh_indices, fresh_tokens
+    ###############################################
     
 def local_selection_with_bonus(score, bonus_ratio, grid_size=2):
     '''
@@ -92,6 +111,14 @@ def local_selection_with_bonus(score, bonus_ratio, grid_size=2):
     score_modified = score_modified.view(batch_size, num_tokens)
     
     return score_modified
+
+def zero_cluster_tokens(tokens, cluster_indices, x):
+    B, N, dim = tokens.shape
+    target_clusters = cluster_indices[:, x].unsqueeze(-1)
+    mask = (cluster_indices == target_clusters)
+    mask_expand = mask.unsqueeze(-1).expand(B, N, dim)
+    tokens[mask_expand] = 0
+    return torch.arange(N, device=tokens.device).expand(B, N), tokens
 
 def consider_neighbor_score(score: torch.Tensor, gamma: float = 0.5) -> torch.Tensor:
     '''
@@ -205,6 +232,47 @@ def get_group_max_score(score, cluster_indices, cluster_nums):
     max_indices = torch.where(valid_maxk, max_indices, torch.tensor(-1, device=score.device))
     return max_indices
 
+def get_max_cluster_indices(score, cluster_indices, cluster_nums):
+    '''
+    找出每个样本中属于最大聚类的索引
+    '''
+    B, N = score.shape
+    device = score.device
+
+    # 1. 生成聚类掩码 [B, cluster_nums, N]
+    cluster_mask = (cluster_indices.unsqueeze(1) == torch.arange(cluster_nums, device=device).view(1, -1, 1))
+
+    # 2. 计算每个聚类的平均分数
+    sum_scores = (score.unsqueeze(1) * cluster_mask).sum(dim=2)  # [B, cluster_nums]
+    counts = cluster_mask.sum(dim=2).float()  # [B, cluster_nums]
+    avg_scores = torch.where(counts > 0, sum_scores / counts, torch.tensor(-float('inf'), device=device))
+
+    # 3. 找到每个样本中平均分最大的聚类索引 [B]
+    max_cluster = avg_scores.argmax(dim=1)
+
+    # 4. 生成每个样本的最大聚类掩码 [B, N]
+    max_cluster_mask = (cluster_indices == max_cluster.unsqueeze(1))
+
+    # 5. 生成原始索引矩阵 [B, N]
+    indices = torch.arange(N, device=device).expand(B, N)
+
+    # 6. 计算每个元素在结果中的位置（通过累加掩码）
+    positions = torch.cumsum(max_cluster_mask.int(), dim=1)  # [B, N]
+    positions = positions * max_cluster_mask  # 只保留选中位置
+
+    # 7. 初始化结果并填充索引
+    result = torch.zeros((B, N), dtype=torch.long, device=device)
+    result.scatter_(dim=1, index=(positions - 1).clamp(min=0), src=indices)
+
+    # 8. 计算每个样本的有效元素数量，并找到全局最大值
+    valid_counts = max_cluster_mask.sum(dim=1)  # [B]
+    max_elements = valid_counts.max().item()
+
+    # 9. 截取结果到最大长度，不足部分自动填充0
+    selected_indices = result[:, :max_elements]
+
+    return selected_indices
+
 def get_cluster_max_indices(score, cluster_indices, cluster_nums):
     B, N = score.shape
     device = score.device
@@ -259,6 +327,7 @@ def get_cluster_topk_indices(score, cluster_indices, cluster_nums, K):
         valid_mask | (cluster_count == 0).unsqueeze(-1),
         topk_indices,
         torch.zeros_like(topk_indices)
+        # torch.randint(0, N, (B, cluster_nums, K), device=device)
     )
     
     return topk_indices.view(B, -1)
